@@ -1,0 +1,114 @@
+library(DESeq2)
+library(clusterProfiler)
+library(org.Mm.eg.db)
+library(ggplot2)
+
+gene_id_file <- "E:/Dual Functional STING Agonist Project/00 - Nature Cancer revision/RNA - Seq/KPC B Cells/counts/new/gene_expected_count_annote_1_3_clusterProfiler.csv"
+gene_data <- read.csv(gene_id_file)
+
+count_matrix <- gene_data[, -c(1:3)]
+rownames(count_matrix) <- gene_data$ENSEMBL
+
+if (!all(sapply(count_matrix, is.numeric))) {
+  stop("Count matrix contains non-numeric values.")
+}
+
+condition <- factor(c("Control", "Control", "Control", "MSA2", "MSA2", "MSA2"))
+
+if (ncol(count_matrix) != length(condition)) {
+  stop("Mismatch between number of samples and conditions.")
+}
+
+sample_info <- data.frame(
+  condition = condition,
+  row.names = colnames(count_matrix)
+)
+
+dds <- DESeqDataSetFromMatrix(countData = count_matrix,
+                              colData = sample_info,
+                              design = ~ condition)
+
+dds <- DESeq(dds)
+
+res <- results(dds, contrast = c("condition", "MSA2", "Control"))
+
+res <- res[order(res$padj), ]
+
+sig_genes <- res[which(res$padj < 0.05), ]
+
+sig_ensembl_ids <- rownames(sig_genes)
+
+sig_gene_data <- gene_data[gene_data$ENSEMBL %in% sig_ensembl_ids, ]
+
+sig_gene_data <- sig_gene_data[!is.na(sig_gene_data$ENTREZID) & sig_gene_data$ENTREZID != "", ]
+
+entrez_ids <- sig_gene_data$ENTREZID
+
+enrich_pathway <- enrichKEGG(gene = entrez_ids,
+                             organism = 'mmu',
+                             pvalueCutoff = 0.05)
+
+if (!is.null(enrich_pathway)) {
+    enrich_results_df <- as.data.frame(enrich_pathway@result)
+        
+    enrich_results_df$BgRatioNumeric <- as.numeric(sub("/.*", "", enrich_results_df$BgRatio)) / 
+                                        as.numeric(sub(".*/", "", enrich_results_df$BgRatio))
+    
+    enrich_results_df <- enrich_results_df[order(enrich_results_df$BgRatioNumeric, decreasing = TRUE), ]
+    
+    enrich_pathway@result <- enrich_results_df
+    
+    p <- dotplot(enrich_pathway) +
+        theme(
+            axis.text.x = element_text(size = 8),
+            axis.text.y = element_text(size = 8)
+        )
+    print(p)
+} else {
+    print("No KEGG pathways were enriched.")
+}
+
+output_directory <- "E:/Dual Functional STING Agonist Project/00 - Nature Cancer revision/RNA - Seq/KPC B Cells"
+
+if (!dir.exists(output_directory)) {
+    dir.create(output_directory, recursive = TRUE)
+}
+
+deseq2_results_file <- file.path(output_directory, "DESeq2_results_MSA2_vs_Control_B.csv")
+write.csv(as.data.frame(res), deseq2_results_file)
+
+if (!is.null(enrich_pathway)) {
+    pathway_results_file <- file.path(output_directory, "pathway_enrichment_results_MSA2_Control_B.csv")
+    write.csv(as.data.frame(enrich_pathway), pathway_results_file)
+}
+
+output_directory <- "E:/Dual Functional STING Agonist Project/00 - Nature Cancer revision/RNA - Seq/KPC B Cells"
+
+if (!dir.exists(output_directory)) {
+    dir.create(output_directory, recursive = TRUE)
+}
+
+tiff_filename <- file.path(output_directory, "clusterProfiler_MSA2_Con_B.tiff")
+
+tiff(filename = tiff_filename, width = 2000, height = 1500, res = 300)
+
+p <- dotplot(enrich_pathway) +
+    scale_color_gradient(low = "blue", high = "red") +  # Adjust color scale from blue to red
+    scale_size(range = c(3, 10)) +  # Adjust dot size
+    theme(
+        axis.title.x = element_text(size = 10),  # Make x-axis title smaller
+        axis.text.x = element_text(size = 8),    # Adjust the font size for the x-axis labels
+        axis.text.y = element_text(size = 8),    # Adjust the font size for the y-axis labels
+        legend.title = element_text(size = 10),  # Adjust legend title size
+        legend.text = element_text(size = 5),   # Adjust legend text size
+        legend.position = "right",              # Place legends on the right
+        legend.box = "vertical"                 # Arrange legends vertically
+    ) +
+    guides(
+        color = guide_colorbar(barwidth = 1, barheight = 7, title.position = "top", title.hjust = 0.5),  # Color gradient legend
+        size = guide_legend(title = "Count", order = 2, override.aes = list(size = 3))                   # Dot size legend
+    )
+
+print(p)
+
+dev.off()
