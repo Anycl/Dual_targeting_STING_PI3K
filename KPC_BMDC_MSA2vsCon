@@ -3,7 +3,7 @@ library(clusterProfiler)
 library(org.Mm.eg.db)
 library(ggplot2)
 
-gene_id_file <- "E:/Dual Functional STING Agonist Project/00 - Nature Cancer revision/RNA - Seq/KPC BMDC Cells/counts/gene_expected_count/0_Gene_expected_count_original_MSA_Con_ClusterProfiler.csv"
+gene_id_file <- "E:/Dual Functional STING Agonist Project/00 - Nature Cancer revision/RNA - Seq/KPC B Cells/counts/new/gene_expected_count_annote_1_3_clusterProfiler.csv"
 gene_data <- read.csv(gene_id_file)
 
 count_matrix <- gene_data[, -c(1:3)]
@@ -44,14 +44,15 @@ sig_gene_data <- sig_gene_data[!is.na(sig_gene_data$ENTREZID) & sig_gene_data$EN
 
 entrez_ids <- sig_gene_data$ENTREZID
 
-
 enrich_pathway <- enrichKEGG(gene = entrez_ids,
                              organism = 'mmu',
                              pvalueCutoff = 0.05)
 
 if (!is.null(enrich_pathway)) {
     enrich_results_df <- as.data.frame(enrich_pathway@result)
-        
+    
+    enrich_results_df <- enrich_results_df[enrich_results_df$pvalue <= 10^-3, ]
+    
     enrich_results_df$BgRatioNumeric <- as.numeric(sub("/.*", "", enrich_results_df$BgRatio)) / 
                                         as.numeric(sub(".*/", "", enrich_results_df$BgRatio))
     
@@ -69,27 +70,27 @@ if (!is.null(enrich_pathway)) {
     print("No KEGG pathways were enriched.")
 }
 
-output_directory <- "E:/Dual Functional STING Agonist Project/00 - Nature Cancer revision/RNA - Seq/KPC BMDC Cells"
+output_directory <- "E:/Dual Functional STING Agonist Project/00 - Nature Cancer revision/RNA - Seq/KPC B Cells"
 
 if (!dir.exists(output_directory)) {
     dir.create(output_directory, recursive = TRUE)
 }
 
-deseq2_results_file <- file.path(output_directory, "DESeq2_results_MSA2_vs_Control_BMDC.csv")
+deseq2_results_file <- file.path(output_directory, "DESeq2_results_MSA2_vs_Control_B.csv")
 write.csv(as.data.frame(res), deseq2_results_file)
 
 if (!is.null(enrich_pathway)) {
-    pathway_results_file <- file.path(output_directory, "pathway_enrichment_results_MSA2_Control_BMDC.csv")
+    pathway_results_file <- file.path(output_directory, "pathway_enrichment_results_MSA2_Control_B.csv")
     write.csv(as.data.frame(enrich_pathway), pathway_results_file)
 }
 
-output_directory <- "E:/Dual Functional STING Agonist Project/00 - Nature Cancer revision/RNA - Seq/KPC BMDC Cells"
+output_directory <- "E:/Dual Functional STING Agonist Project/00 - Nature Cancer revision/RNA - Seq/KPC B Cells"
 
 if (!dir.exists(output_directory)) {
     dir.create(output_directory, recursive = TRUE)
 }
 
-tiff_filename <- file.path(output_directory, "clusterProfiler_MSA2_Con_BMDC.tiff")
+tiff_filename <- file.path(output_directory, "clusterProfiler_MSA2_Con_B.tiff")
 
 tiff(filename = tiff_filename, width = 2000, height = 1500, res = 300)
 
